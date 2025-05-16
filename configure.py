@@ -5,8 +5,50 @@ from simple_term_menu import TerminalMenu
 from pathlib import Path
 import paramiko 
 import datetime
+import requests
 
 load_dotenv()
+
+class TailscaleAPI:
+    def __init__(self, api_key, tailnet_name="", api_url="https://api.tailscale.com/api/v2"):
+        self.tailnet_name = tailnet_name
+        
+        self.tskey = api_key
+        
+        # Ustawienie nagłówka autoryzacji
+        self.headers = {
+            "Authorization": f"Bearer {self.tskey}",
+            "Content-Type": "application/json"
+        }
+        
+        # Ustawienie podstawowego URL API
+        self.api_url = api_url
+
+    def get_devices(self):
+        url = f"{self.api_url}/tailnet/{self.tailnet_name}/devices"
+        response = requests.get(url, headers=self.headers)
+        return self._handle_response(response)
+
+    def get_device(self, device_id):
+        url = f"{self.api_url}/device/{device_id}"
+        response = requests.get(url, headers=self.headers)
+        return self._handle_response(response)
+
+    def delete_device(self, device_id):
+        url = f"{self.api_url}/device/{device_id}"
+        response = requests.delete(url, headers=self.headers)
+        return self._handle_response(response)
+
+    def create_key(self, payload, querystring=None):
+        url = f"{self.api_url}/tailnet/{self.tailnet_name}/keys"
+        response = requests.post(url, json=payload, headers=self.headers, params=querystring)
+        return self._handle_response(response)
+
+    def _handle_response(self, response):
+        if response.status_code == 200:
+            return response.json()
+        else:
+            response.raise_for_status()
 
 commands = [
     "apt update",
@@ -68,12 +110,31 @@ def main():
     pkey = paramiko.RSAKey.from_private_key_file(ssh_keys[selected_index][1])
     ssh_client.connect(instance_info['public_ipaddr'], username='root', pkey=pkey, port=instance_info['ports']['22/tcp'][0]['HostPort'])
 
+    tailscape = TailscaleAPI(api_key=os.environ.get('TAILSCAPE_API_KEY'), tailnet_name=os.environ.get('TAILSCALE_TAILNET_NAME'))
+    response = tailscape.create_key(
+        {
+            "description": "dev access",
+            "capabilities": { "devices": { "create": {
+                        "reusable": True,
+                        "ephemeral": False,
+                        "preauthorized": True
+                    } } },
+            "expirySeconds": 86400,
+            "scopes": ["all:read"]
+        },
+        {"all": True}
+    )
+    commands.append(f'curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up --auth-key={response['key']} --hostname={instance_info['geolocation'].replace(' ', '-').replace(',', '')}-{instance_info['gpu_name'].replace(' ','-')}')
+    commands.append(f'tailscale up')
+
     for command in commands:
+        print(f'executing command: {command}')
         stdin, stdout, stderr = ssh_client.exec_command(command=command)
         stdout_file.writelines(f'{stdout.read().decode('utf-8')}\n')
         stderr_file.writelines(f'{stderr.read().decode('utf-8')}\n')
 
     
+
 
 if __name__=="__main__":
     main()
