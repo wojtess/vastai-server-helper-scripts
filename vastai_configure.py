@@ -1,3 +1,4 @@
+#!/home/wojtess/Documents/powertrain/server-vastai/vastai-env/bin/python3
 from dotenv import load_dotenv
 from vastai_sdk import VastAI
 import os
@@ -52,7 +53,7 @@ class TailscaleAPI:
 
 commands = [
     "apt update",
-    "apt install -y xfce4 xfce4-goodies tightvncserver"
+    # "apt install -y xfce4 xfce4-goodies tightvncserver"
 ]
 
 def get_private_ssh_keys():
