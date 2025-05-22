@@ -1,4 +1,4 @@
-#!/home/wojtess/Documents/powertrain/server-vastai/vastai-env/bin/python3
+#!/Users/wojtess/Documents/powertrain/vastai-server-helper-scripts/vastai-env/bin/python3
 from dotenv import load_dotenv
 from vastai_sdk import VastAI
 import os
